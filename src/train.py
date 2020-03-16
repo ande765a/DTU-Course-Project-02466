@@ -39,7 +39,7 @@ def pad_collate(datapoints):
   
   return batch_size, waveforms, waveform_lengths, utterances, utterance_lengths
 
-def train(num_epochs=10, batch_size=64, num_workers=multiprocessing.cpu_count()):
+def train(num_epochs=10, batch_size=8, num_workers=multiprocessing.cpu_count()):
   dataset = LIBRISPEECH("../data", "dev-clean", download=True)
   dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate, num_workers=num_workers)
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
