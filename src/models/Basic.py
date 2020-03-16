@@ -9,3 +9,6 @@ class Basic(nn.Module):
   def forward(self, X):
     a = self.c1(X)
     return self.log_softmax(a)
+
+  def forward_shape(self, lengths):
+    return lengths - 32 + 1
