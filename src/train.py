@@ -39,17 +39,21 @@ def pad_collate(datapoints):
   
   return batch_size, waveforms, waveform_lengths, utterances, utterance_lengths
 
-def train(num_epochs=10, batch_size=8, num_workers=multiprocessing.cpu_count()):
+def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
   dataset = LIBRISPEECH("../data", "dev-clean", download=True)
-  dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate, num_workers=num_workers)
+  dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate, num_workers=num_workers, pin_memory=True)
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-  model = Basic(n_classes = len(dictionary) + 1).to(device)
-  optimizer = Adam(model.parameters(), lr=0.001)
+  original_model = Basic(n_classes = len(dictionary) + 1).to(device)
+  model = original_model
+  optimizer = SGD(model.parameters(), lr=0.01) #Adam(model.parameters(), lr=0.001)
   loss_fn = CTCLoss(zero_infinity=True)
-
+  print(f"Using device: {device}")
+  
+  tqdm_dataloader = tqdm(dataloader)
+  
   for epoch in range(num_epochs):
-    print(f"Training epoch: {epoch}")
-    for i, (batch_size, X, X_lengths, y, y_lengths) in tqdm(enumerate(dataloader)):
+    print(f"Training epoch: {epoch+1}")
+    for batch_size, X, X_lengths, y, y_lengths in tqdm_dataloader:
       # First we zero our gradients, to make everything work nicely.
       optimizer.zero_grad()
 
@@ -63,14 +67,13 @@ def train(num_epochs=10, batch_size=8, num_workers=multiprocessing.cpu_count()):
       # In our case that is the length of the dictionary + 1
       # as we also need one more class for the blank character.
       pred_y = model(X)
-      pred_y_lengths = model.forward_shape(X_lengths)
+      pred_y_lengths = original_model.forward_shape(X_lengths)
       N, C, T = pred_y.shape
       pred_y = pred_y.view(T, N, C)
       
       loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
+      tqdm_dataloader.set_description(f"Loss: {loss.item()}")
       loss.backward()
-      print(loss.item())
-
       optimizer.step()
 
 if __name__ == "__main__":
