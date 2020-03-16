@@ -48,6 +48,7 @@ def train(num_epochs=10, batch_size=64, num_workers=multiprocessing.cpu_count())
   loss_fn = CTCLoss(zero_infinity=True)
 
   for epoch in range(num_epochs):
+    print(f"Training epoch: {epoch}")
     for i, (batch_size, X, X_lengths, y, y_lengths) in tqdm(enumerate(dataloader)):
       # First we zero our gradients, to make everything work nicely.
       optimizer.zero_grad()
@@ -68,6 +69,7 @@ def train(num_epochs=10, batch_size=64, num_workers=multiprocessing.cpu_count())
       
       loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
       loss.backward()
+      print(loss.item())
 
       optimizer.step()
 
