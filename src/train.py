@@ -10,7 +10,7 @@ from models.Basic import Basic
 from tqdm import tqdm
 import multiprocessing
 
-dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZ "
+dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "
 
 def text_to_tensor(text, dictionary = dictionary):
   """
@@ -20,7 +20,7 @@ def text_to_tensor(text, dictionary = dictionary):
   character.
   """
   return torch.tensor([
-    dictionary.index(c) + 1 if c in dictionary else 0 
+    dictionary.index(c) + 1 if c in dictionary else -1 
     for c in list(text.upper())
   ])
 
@@ -35,7 +35,7 @@ def pad_collate(datapoints):
   # and reshape the data to (N, S) where N is batch size
   # and S is max target length. Is needed for CTCLoss:
   # https://pytorch.org/docs/stable/nn.html#torch.nn.CTCLoss
-  utterances = pad_sequence([text_to_tensor(utterance) for utterance in utterances], batch_first=True)
+  utterances = torch.cat([text_to_tensor(utterance) for utterance in utterances])
   
   return batch_size, waveforms, waveform_lengths, utterances, utterance_lengths
 
@@ -45,7 +45,7 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   original_model = Basic(n_classes = len(dictionary) + 1).to(device)
   model = original_model
-  optimizer = SGD(model.parameters(), lr=0.01) #Adam(model.parameters(), lr=0.001)
+  optimizer = SGD(model.parameters(), lr=0.000)
   loss_fn = CTCLoss(zero_infinity=True)
   print(f"Using device: {device}")
   
