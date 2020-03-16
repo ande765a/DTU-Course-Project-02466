@@ -45,7 +45,7 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   original_model = Basic(n_classes = len(dictionary) + 1).to(device)
   model = original_model
-  optimizer = SGD(model.parameters(), lr=0.000)
+  optimizer = SGD(model.parameters(), lr=0.001)
   loss_fn = CTCLoss(zero_infinity=True)
   print(f"Using device: {device}")
   
@@ -66,7 +66,7 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
       # T is target length, N is batch size and C is number of classes.
       # In our case that is the length of the dictionary + 1
       # as we also need one more class for the blank character.
-      pred_y = model(X)
+      pred_y = model(X).detach().requires_grad_()
       pred_y_lengths = original_model.forward_shape(X_lengths)
       N, C, T = pred_y.shape
       pred_y = pred_y.view(T, N, C)
