@@ -20,7 +20,7 @@ def text_to_tensor(text, dictionary = dictionary):
   character.
   """
   return torch.tensor([
-    dictionary.index(c) + 1 if c in dictionary else -1 
+    dictionary.index(c) + 1 if c in dictionary else 0
     for c in list(text.upper())
   ])
 
@@ -43,10 +43,9 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
   dataset = LIBRISPEECH("../data", "dev-clean", download=True)
   dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate, num_workers=num_workers, pin_memory=True)
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-  original_model = Basic(n_classes = len(dictionary) + 1).to(device)
-  model = original_model
-  optimizer = SGD(model.parameters(), lr=0.001)
-  loss_fn = CTCLoss(zero_infinity=True)
+  model = Basic(n_classes = len(dictionary) + 1).to(device)
+  optimizer = SGD(model.parameters(), lr=0.0001)
+  loss_fn = CTCLoss()
   print(f"Using device: {device}")
   
   tqdm_dataloader = tqdm(dataloader)
@@ -57,8 +56,8 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
       # First we zero our gradients, to make everything work nicely.
       optimizer.zero_grad()
 
-      N, T, C = X.shape
-      X = X.view(N, C, T).to(device)
+      X = X.permute(0, 2, 1).to(device)
+      X_lengths = X_lengths.to(device)
       y = y.to(device)
 
       # We predict the outputs using our model
@@ -66,15 +65,16 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
       # T is target length, N is batch size and C is number of classes.
       # In our case that is the length of the dictionary + 1
       # as we also need one more class for the blank character.
-      pred_y = model(X).detach().requires_grad_()
-      pred_y_lengths = original_model.forward_shape(X_lengths)
-      N, C, T = pred_y.shape
-      pred_y = pred_y.view(T, N, C)
+      pred_y = model(X)
+      pred_y = pred_y.permute(2, 0, 1)
+      pred_y_lengths = model.forward_shape(X_lengths).to(device)
       
       loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
       tqdm_dataloader.set_description(f"Loss: {loss.item()}")
       loss.backward()
+      print(loss.grad)
       optimizer.step()
+
 
 if __name__ == "__main__":
   train()
