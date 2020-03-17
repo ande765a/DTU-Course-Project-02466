@@ -72,7 +72,6 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
       loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
       tqdm_dataloader.set_description(f"Loss: {loss.item()}")
       loss.backward()
-      print(loss.grad)
       optimizer.step()
 
 
