@@ -44,15 +44,16 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
   dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate, num_workers=num_workers, pin_memory=True)
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   model = Basic(n_classes = len(dictionary) + 1).to(device)
-  optimizer = SGD(model.parameters(), lr=0.0001)
+  optimizer = SGD(model.parameters(), lr=1e-3)
   loss_fn = CTCLoss()
   print(f"Using device: {device}")
   
-  tqdm_dataloader = tqdm(dataloader)
   
   for epoch in range(num_epochs):
     print(f"Training epoch: {epoch+1}")
-    for batch_size, X, X_lengths, y, y_lengths in tqdm_dataloader:
+
+    tqdm_dataloader = tqdm(dataloader)
+    for i, (batch_size, X, X_lengths, y, y_lengths) in enumerate(tqdm_dataloader):
       # First we zero our gradients, to make everything work nicely.
       optimizer.zero_grad()
 
@@ -70,10 +71,11 @@ def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
       pred_y_lengths = model.forward_shape(X_lengths).to(device)
       
       loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
-      tqdm_dataloader.set_description(f"Loss: {loss.item()}")
       loss.backward()
       optimizer.step()
 
+      if i % 10 == 0:
+        tqdm_dataloader.set_description(f"Loss: {loss.item()}")
 
 if __name__ == "__main__":
   train()
