@@ -77,5 +77,8 @@ def train(num_epochs=10, batch_size=8, num_workers=multiprocessing.cpu_count()):
       if i % 10 == 0:
         tqdm_dataloader.set_description(f"Loss: {loss.item()}")
 
+		#indsæt WER her?
+
+
 if __name__ == "__main__":
   train()
