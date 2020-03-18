@@ -39,12 +39,12 @@ def pad_collate(datapoints):
   
   return batch_size, waveforms, waveform_lengths, utterances, utterance_lengths
 
-def train(num_epochs=10, batch_size=4, num_workers=multiprocessing.cpu_count()):
+def train(num_epochs=10, batch_size=8, num_workers=multiprocessing.cpu_count()):
   dataset = LIBRISPEECH("../data", "dev-clean", download=True)
   dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate, num_workers=num_workers, pin_memory=True)
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   model = Basic(n_classes = len(dictionary) + 1).to(device)
-  optimizer = SGD(model.parameters(), lr=1e-3)
+  optimizer = Adam(model.parameters(), lr=1e-3)
   loss_fn = CTCLoss()
   print(f"Using device: {device}")
   
