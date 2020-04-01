@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import torch
+import argparse
 import torch.nn as nn
 import numpy as np
 import multiprocessing
@@ -49,32 +50,39 @@ def pad_collate(datapoints):
   return batch_size, waveforms, waveform_lengths, utterances, utterance_lengths
 
 
-def train(num_epochs=10, batch_size=16,
+def train(data_path="../data",
+          train_dataset="dev-clean",
+          num_epochs=10,
+          batch_size=32,
+          parallel=False,
+          device_name=None,
           num_workers=multiprocessing.cpu_count()):
-  dataset = LIBRISPEECH("../data", "dev-clean", download=True)
+  dataset = LIBRISPEECH(data_path, train_dataset, download=True)
   dataloader = DataLoader(
       dataset,
       batch_size=batch_size,
       shuffle=True,
       collate_fn=pad_collate,
-      num_workers=num_workers,
-      pin_memory=True)
-  device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+      num_workers=num_workers)
+  device = torch.device(device_name) if device_name else torch.device(
+      "cuda" if torch.cuda.is_available() else "cpu")
   model = Basic(n_classes=len(dictionary) + 1).to(device)
+  if parallel:
+    model = nn.DataParallel(model)
+
   optimizer = Adam(model.parameters(), lr=1e-3)
   loss_fn = CTCLoss()
   print(f"Using device: {device}")
 
   train_cer_history = []
   loss_history = []
-
   for epoch in range(num_epochs):
     try:
       print(f"Training epoch: {epoch+1}")
-
       tqdm_dataloader = tqdm(dataloader)
       for i, (batch_size, X, X_lengths, y,
               y_lengths) in enumerate(tqdm_dataloader):
+
         # First we zero our gradients, to make everything work nicely.
         optimizer.zero_grad()
 
@@ -101,13 +109,44 @@ def train(num_epochs=10, batch_size=16,
           tqdm_dataloader.set_description(f"Loss: {loss.item()}")
           #print([remove_blanks(collapse(tensor_to_text(tensor[:l]))) for tensor, l in zip(pred_y.permute(1, 0, 2).argmax(dim = 2), pred_y_lengths)])
     except KeyboardInterrupt:
+      print("")
       print("Training interrupted.")
-      break
-  #indsæt WER her?
+      print("")
+      print("Available commands:")
+      print("stop \t Stops training")
+      print("save \t Saves history and continues")
+      print("")
+      cmd = input("Command: ")
+      if cmd == "stop":
+        break
+      elif cmd == "save":
+        np.save("loss_history", loss_history)
+        continue
 
-  # Save loss history
   np.save("loss_history", loss_history)
 
 
 if __name__ == "__main__":
-  train()
+  parser = argparse.ArgumentParser(description="ASR Model Trainer")
+  parser.add_argument(
+      "--data-path", type=str, help="Path for data", default="../data")
+  parser.add_argument(
+      "--train-dataset", type=str, help="Dataset name", default="dev-clean")
+  parser.add_argument("--device-name", type=str, help="Device name")
+  parser.add_argument("--batch-size", type=int, help="Batch size", default=32)
+  parser.add_argument(
+      "--parallel",
+      type=bool,
+      nargs="?",
+      const=True,
+      help="Train in parallel",
+      default=False)
+
+  args = parser.parse_args()
+
+  train(
+      data_path=args.data_path,
+      train_dataset=args.train_dataset,
+      device_name=args.device_name,
+      batch_size=args.batch_size,
+      parallel=args.parallel)
