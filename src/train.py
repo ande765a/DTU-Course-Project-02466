@@ -8,7 +8,9 @@ from torch.optim import Adam, SGD
 from torchaudio.datasets import LIBRISPEECH
 from models.Basic import Basic
 from tqdm import tqdm
+from evals import WER, CER
 import multiprocessing
+
 
 dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "
 
@@ -23,6 +25,9 @@ def text_to_tensor(text, dictionary = dictionary):
     dictionary.index(c) + 1 if c in dictionary else 0
     for c in list(text.upper())
   ])
+
+def tensor_to_text(tensor, dictionary = dictionary):
+  return "".join(["-" if i == 0 else dictionary[i - 1] for i in tensor])
 
 def pad_collate(datapoints):
   waveforms, sample_rates, utterances, speaker_ids, chapter_ids, utterance_ids = zip(*datapoints)
@@ -76,6 +81,7 @@ def train(num_epochs=10, batch_size=8, num_workers=multiprocessing.cpu_count()):
 
       if i % 10 == 0:
         tqdm_dataloader.set_description(f"Loss: {loss.item()}")
+        [tensor_to_text(tensor[:l]) for tensor, l in zip(pred_y.permute(1, 0, 2).argmax(dim = 2), pred_y_lengths)]
 
 		#indsæt WER her?
 
