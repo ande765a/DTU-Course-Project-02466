@@ -11,6 +11,7 @@ from torch.optim import Adam, SGD
 from torchaudio.datasets import LIBRISPEECH
 from models.Basic import Basic
 from tqdm import tqdm
+from torch.utils.tensorboard import SummaryWriter
 from evaluation import WER, CER, collapse, remove_blanks
 
 dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "
@@ -38,16 +39,15 @@ def pad_collate(datapoints):
   batch_size = len(datapoints)
   waveform_lengths = torch.tensor([waveform.shape[1] for waveform in waveforms])
   waveforms = pad_sequence([wave.T for wave in waveforms], batch_first=True)
-  utterance_lengths = torch.tensor([len(utterance) for utterance in utterances])
+  label_lengths = torch.tensor([len(utterance) for utterance in utterances])
 
   # We convert our label text to tensor of dictionary indicies
   # and reshape the data to (N, S) where N is batch size
   # and S is max target length. Is needed for CTCLoss:
   # https://pytorch.org/docs/stable/nn.html#torch.nn.CTCLoss
-  utterances = torch.cat(
-      [text_to_tensor(utterance) for utterance in utterances])
+  labels = torch.cat([text_to_tensor(utterance) for utterance in utterances])
 
-  return batch_size, waveforms, waveform_lengths, utterances, utterance_lengths
+  return batch_size, waveforms, waveform_lengths, labels, label_lengths, utterances
 
 
 def train(data_path="../data",
@@ -56,6 +56,8 @@ def train(data_path="../data",
           batch_size=32,
           parallel=False,
           device_name=None,
+          load=None,
+          save=None,
           num_workers=multiprocessing.cpu_count()):
   dataset = LIBRISPEECH(data_path, train_dataset, download=True)
   dataloader = DataLoader(
@@ -66,64 +68,70 @@ def train(data_path="../data",
       num_workers=num_workers)
   device = torch.device(device_name) if device_name else torch.device(
       "cuda" if torch.cuda.is_available() else "cpu")
-  model = Basic(n_classes=len(dictionary) + 1).to(device)
-  if parallel:
-    model = nn.DataParallel(model)
+
+  original_model = Basic(n_classes=len(dictionary) + 1).to(device)
+  model = nn.DataParallel(original_model) if parallel else original_model
+
+  if load:
+    print(f"Loading model parameters from: {load}")
+    model.load_state_dict(torch.load(load))
 
   optimizer = Adam(model.parameters(), lr=1e-3)
   loss_fn = CTCLoss()
   print(f"Using device: {device}")
 
+  writer = SummaryWriter()
   train_cer_history = []
   loss_history = []
+
+  n_iter = 0
   for epoch in range(num_epochs):
-    try:
-      print(f"Training epoch: {epoch+1}")
-      tqdm_dataloader = tqdm(dataloader)
-      for i, (batch_size, X, X_lengths, y,
-              y_lengths) in enumerate(tqdm_dataloader):
+    print(f"Training epoch: {epoch+1}")
+    tqdm_dataloader = tqdm(dataloader)
+    for i, data in enumerate(tqdm_dataloader):
+      n_iter += 1
 
-        # First we zero our gradients, to make everything work nicely.
-        optimizer.zero_grad()
+      batch_size, X, X_lengths, y, y_lengths, texts = data
 
-        X = X.permute(0, 2, 1).to(device)
-        X_lengths = X_lengths.to(device)
-        y = y.to(device)
+      # First we zero our gradients, to make everything work nicely.
+      optimizer.zero_grad()
 
-        # We predict the outputs using our model
-        # and reshape the data to size (T, N, C) where
-        # T is target length, N is batch size and C is number of classes.
-        # In our case that is the length of the dictionary + 1
-        # as we also need one more class for the blank character.
-        pred_y = model(X)
-        pred_y = pred_y.permute(2, 0, 1)
-        pred_y_lengths = model.forward_shape(X_lengths).to(device)
+      X = X.permute(0, 2, 1).to(device)
+      X_lengths = X_lengths.to(device)
+      y = y.to(device)
 
-        loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
-        loss.backward()
-        optimizer.step()
+      # We predict the outputs using our model
+      # and reshape the data to size (T, N, C) where
+      # T is target length, N is batch size and C is number of classes.
+      # In our case that is the length of the dictionary + 1
+      # as we also need one more class for the blank character.
+      pred_y = model.forward(X)
+      pred_y = pred_y.permute(2, 0, 1)
+      pred_y_lengths = Basic.forward_shape(X_lengths).to(device)
 
-        loss_history.append(loss.item())
+      loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
+      loss.backward()
+      optimizer.step()
 
-        if i % 10 == 0:
-          tqdm_dataloader.set_description(f"Loss: {loss.item()}")
-          #print([remove_blanks(collapse(tensor_to_text(tensor[:l]))) for tensor, l in zip(pred_y.permute(1, 0, 2).argmax(dim = 2), pred_y_lengths)])
-    except KeyboardInterrupt:
-      print("")
-      print("Training interrupted.")
-      print("")
-      print("Available commands:")
-      print("stop \t Stops training")
-      print("save \t Saves history and continues")
-      print("")
-      cmd = input("Command: ")
-      if cmd == "stop":
-        break
-      elif cmd == "save":
-        np.save("loss_history", loss_history)
-        continue
+      loss_history.append(loss.item())
 
-  np.save("loss_history", loss_history)
+      writer.add_scalar('Loss/train', loss.item(), n_iter)
+
+      if n_iter % 10 == 0:
+        pred_texts = ", ".join([
+            remove_blanks(collapse(tensor_to_text(tensor[:l])))
+            for tensor, l in zip(
+                pred_y.permute(1, 0, 2).argmax(dim=2), pred_y_lengths)
+        ])
+        real_texts = ", ".join(texts)
+        writer.add_text("Predicted", pred_texts, n_iter)
+        writer.add_text("Real", real_texts, n_iter)
+
+  if save:
+    print(f"Saving model to: {save}")
+    torch.save(model.state_dict(), save)
+
+  writer.close()
 
 
 if __name__ == "__main__":
@@ -141,6 +149,16 @@ if __name__ == "__main__":
       const=True,
       help="Train in parallel",
       default=False)
+  parser.add_argument(
+      "--num-epochs",
+      type=int,
+      help="Number of epochs to train for",
+      default=10)
+  parser.add_argument(
+      "--load", type=str, help="Load model parameters", default=None)
+
+  parser.add_argument(
+      "--save", type=str, help="Save model parameters", default=None)
 
   args = parser.parse_args()
 
@@ -149,4 +167,7 @@ if __name__ == "__main__":
       train_dataset=args.train_dataset,
       device_name=args.device_name,
       batch_size=args.batch_size,
-      parallel=args.parallel)
+      parallel=args.parallel,
+      num_epochs=args.num_epochs,
+      load=args.load,
+      save=args.save)
