@@ -23,6 +23,5 @@ class Basic(nn.Module):
     out = F.log_softmax(self.c3(out), dim=1)
     return out
 
-  @staticmethod
-  def forward_shape(lengths):
+  def forward_shape(self, lengths):
     return (lengths / (400 / 2)).int() + 1 - 8 - 16

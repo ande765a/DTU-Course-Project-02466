@@ -9,7 +9,7 @@ from torch.nn import CTCLoss
 from torch.utils.data import DataLoader
 from torch.optim import Adam, SGD
 from torchaudio.datasets import LIBRISPEECH
-from models.Basic import Basic
+from models import Basic, ResNet
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from evaluation import WER, CER, collapse, remove_blanks
@@ -58,6 +58,8 @@ def train(data_path="../data",
           device_name=None,
           load=None,
           save=None,
+          model=None,
+          log_dir="runs",
           num_workers=multiprocessing.cpu_count()):
   dataset = LIBRISPEECH(data_path, train_dataset, download=True)
   dataloader = DataLoader(
@@ -69,7 +71,9 @@ def train(data_path="../data",
   device = torch.device(device_name) if device_name else torch.device(
       "cuda" if torch.cuda.is_available() else "cpu")
 
-  original_model = Basic(n_classes=len(dictionary) + 1).to(device)
+  n_classes = len(dictionary) + 1
+  original_model = ResNet(n_classes) if model == "ResNet" else Basic(n_classes)
+  original_model = original_model.to(device)
   model = nn.DataParallel(original_model) if parallel else original_model
 
   if load:
@@ -80,7 +84,7 @@ def train(data_path="../data",
   loss_fn = CTCLoss()
   print(f"Using device: {device}")
 
-  writer = SummaryWriter()
+  writer = SummaryWriter(log_dir)
   train_cer_history = []
   loss_history = []
 
@@ -107,7 +111,7 @@ def train(data_path="../data",
       # as we also need one more class for the blank character.
       pred_y = model.forward(X)
       pred_y = pred_y.permute(2, 0, 1)
-      pred_y_lengths = Basic.forward_shape(X_lengths).to(device)
+      pred_y_lengths = original_model.forward_shape(X_lengths).to(device)
 
       loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
       loss.backward()
@@ -160,6 +164,10 @@ if __name__ == "__main__":
   parser.add_argument(
       "--save", type=str, help="Save model parameters", default=None)
 
+  parser.add_argument("--model", type=str, help="Model", default=None)
+  parser.add_argument(
+      "--log-dir", type=str, help="Directory to save logs", default=None)
+
   args = parser.parse_args()
 
   train(
@@ -170,4 +178,6 @@ if __name__ == "__main__":
       parallel=args.parallel,
       num_epochs=args.num_epochs,
       load=args.load,
-      save=args.save)
+      save=args.save,
+      log_dir=args.log_dir,
+      model=args.model)

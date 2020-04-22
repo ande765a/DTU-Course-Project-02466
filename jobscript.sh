@@ -21,5 +21,8 @@ PATH=~/miniconda3/bin:$PATH
   --data-path /work3/s183926/data/librispeech \
   --train-dataset train-clean-360 \
   --batch-size 32 \
-  --num-epochs 1 \
-  --save models/100-real.pt
+  --num-epochs 10 \
+  --device-name cuda:2 \
+  --model ResNet \
+  --log-dir /work3/s183926/runs \
+  --save models/resnet-100-real_10-epochs-SGD.pt
