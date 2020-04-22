@@ -1,11 +1,11 @@
 #!/bin/sh
 #BSUB -q gpuv100
 #BSUB -J asr-model
-#BSUB -n 8
+#BSUB -n 16
 #BSUB -R "span[block=1]"
-#BSUB -gpu "num=1:mode=exclusive_process"
+#BSUB -gpu "num=4:mode=exclusive_process"
 #BSUB -W 24:00
-#BSUB -R "rusage[mem=32GB]"
+#BSUB -R "rusage[mem=64GB]"
 #BSUB -u andersbthuesen@gmail.com
 #BSUB -B
 #BSUB -N
@@ -19,9 +19,10 @@ PATH=~/miniconda3/bin:$PATH
 
 ./src/train.py \
   --data-path /work3/s183926/data/librispeech \
-  --train-dataset train-clean-360 \
-  --batch-size 32 \
-  --num-epochs 10 \
+  --dataset train-clean-360 \
+  --batch-size 128 \
+  --num-epochs 40 \
   --model ResNet \
-  --log-dir /work3/s183926/runs \
-  --save models/resnet_100-real_10-epochs.pt
+  --parallel \
+  --log-dir /work3/s183926/runs/resnet-100_real \
+  --save models/resnet_100-real_40-epochs.pt

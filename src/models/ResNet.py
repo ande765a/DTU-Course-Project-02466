@@ -1,14 +1,11 @@
 import torch.nn as nn
 import torch.nn.functional as F
-from torchaudio.transforms import MFCC
 
 
 class ResNet(nn.Module):
 
   def __init__(self, n_classes):
     super(ResNet, self).__init__()
-    self.mfcc = MFCC(n_mfcc=64)
-
     self.a1 = nn.Conv2d(1, 64, kernel_size=1, stride=1)
 
     self.c1 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
@@ -24,22 +21,23 @@ class ResNet(nn.Module):
     self.bn3 = nn.BatchNorm2d(128)
     self.c4 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
     self.bn4 = nn.BatchNorm2d(128)
-    self.mp2 = nn.MaxPool2d(2)
+    self.mp2 = nn.MaxPool2d((2, 1))
     # Height after: (31 - 4 + 3) / 2 = 14
 
     self.c5 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
     self.bn5 = nn.BatchNorm2d(128)
     self.c6 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
     self.bn6 = nn.BatchNorm2d(128)
-    self.mp3 = nn.MaxPool2d(2)
+    self.mp3 = nn.MaxPool2d((2, 1))
     # Height after: (14 - 5 + 3) / 2 = 5
 
     self.c7 = nn.Conv1d(128 * 8, n_classes, kernel_size=1, stride=1)
 
   def forward(self, X):
     # Make spectogram
-    out = self.mfcc(X)
-    out = self.a1(out)
+    #out = self.mfcc(X)
+
+    out = self.a1(X)
     out = F.relu(out)
 
     # Resnet block 1
@@ -91,8 +89,5 @@ class ResNet(nn.Module):
     return out
 
   def forward_shape(self, lengths):
-    out_lengths = lengths // (400 // 2)
-    out_lengths = out_lengths // 2  # ResNet 2
-    out_lengths = out_lengths // 2  # ResNet 2
-    out_lengths = out_lengths // 2  # ResNet 3
+    out_lengths = lengths // 2
     return out_lengths

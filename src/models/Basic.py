@@ -24,4 +24,4 @@ class Basic(nn.Module):
     return out
 
   def forward_shape(self, lengths):
-    return (lengths / (400 / 2)).int() + 1 - 8 - 16
+    return lengths // (400 / 2) + 1 - 8 - 16
