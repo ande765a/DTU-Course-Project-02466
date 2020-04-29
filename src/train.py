@@ -38,18 +38,24 @@ def tensor_to_text(tensor, dictionary=dictionary):
 mfcc = MFCC(n_mfcc=64)
 
 
+def waveforms_to_padded_mfccs(waveforms):
+  mfccs = [mfcc(wave) for wave in waveforms]
+  mfcc_lenghts = torch.tensor([mfcc.shape[2] for mfcc in mfccs])
+  padded_mfccs = pad_sequence([mfcc.T for mfcc in mfccs],
+                              batch_first=True).permute(0, 3, 2, 1)
+  return padded_mfccs, mfcc_lenghts
+
+
+def encode_utterances(utterances):
+  encodings = torch.cat([text_to_tensor(utterance) for utterance in utterances])
+  encoding_lengths = torch.tensor([len(utterance) for utterance in utterances])
+  return encodings, encoding_lengths
+
+
 def pad_collate(datapoints):
   waveforms, _, utterances, *rest = zip(*datapoints)
 
-  mfccs = [mfcc(wave) for wave in waveforms]
-  mfcc_lengths = torch.tensor([mfcc.shape[2] for mfcc in mfccs])
-  padded_mfccs = pad_sequence([mfcc.T for mfcc in mfccs],
-                              batch_first=True).permute(0, 3, 2, 1)
-
-  labels = torch.cat([text_to_tensor(utterance) for utterance in utterances])
-  label_lengths = torch.tensor([len(utterance) for utterance in utterances])
-
-  return padded_mfccs, mfcc_lengths, labels, label_lengths, utterances
+  return waveforms, utterances
 
 
 def train(data_path="../data",
@@ -116,14 +122,15 @@ def train(data_path="../data",
   for epoch in range(num_epochs):
     print(f"Training epoch: {epoch+1}")
     tqdm_train_dataloader = tqdm(train_dataloader)
-    for i, data in enumerate(tqdm_train_dataloader):
-      model.train()
-
+    for i, (waveforms, utterances) in enumerate(tqdm_train_dataloader):
       n_iter += 1
-      X, X_lengths, y, y_lengths, texts = data
+      model.train()
 
       # First we zero our gradients, to make everything work nicely.
       optimizer.zero_grad()
+
+      X, X_lengths = waveforms_to_padded_mfccs(waveforms)
+      y, y_lengths = encode_utterances(utterances)
 
       X = X.to(device)
       X_lengths = X_lengths.to(device)
@@ -148,8 +155,10 @@ def train(data_path="../data",
 
           train_loss = loss.item()
 
-          # Validate
-          X, X_lengths, y, y_lengths, texts = next(iter(val_dataloader))
+          waveforms, utterances = next(iter(val_dataloader))
+
+          X, X_lengths = waveforms_to_padded_mfccs(waveforms)
+          y, y_lengths = encode_utterances(utterances)
 
           X = X.to(device)
           X_lengths = X_lengths.to(device)
@@ -162,7 +171,7 @@ def train(data_path="../data",
           loss = loss_fn(pred_y, y, pred_y_lengths, y_lengths)
 
           val_loss = loss.item()
-          val_texts_real = texts
+          val_texts_real = utterances
           val_texts_pred = [
               remove_blanks(collapse(tensor_to_text(tensor[:l])))
               for tensor, l in zip(
@@ -214,6 +223,8 @@ if __name__ == "__main__":
       help="Number of epochs to train for",
       default=10)
   parser.add_argument(
+      "--num-workers", type=int, help="How many workers to use", default=None)
+  parser.add_argument(
       "--load", type=str, help="Load model parameters", default=None)
 
   parser.add_argument(
@@ -235,4 +246,5 @@ if __name__ == "__main__":
       load=args.load,
       save=args.save,
       log_dir=args.log_dir,
+      num_workers=args.num_workers,
       model=args.model)
