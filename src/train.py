@@ -10,7 +10,7 @@ from torchaudio.transforms import MFCC
 from torch.utils.data import DataLoader, random_split, RandomSampler
 from torch.optim import Adam, SGD
 from torchaudio.datasets import LIBRISPEECH
-from models import Basic, ResNet
+from models import ResNet, DilatedResNet
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from evaluation import WER, CER, collapse, remove_blanks
@@ -58,6 +58,15 @@ def pad_collate(datapoints):
   return waveforms, utterances
 
 
+def get_model(model):
+  if model == "DilatedResNet":
+    return DilatedResNet
+  elif model == "ResNet":
+    return ResNet
+  else:
+    return Basic
+
+
 def train(data_path="../data",
           dataset="dev-clean",
           num_epochs=10,
@@ -103,7 +112,8 @@ def train(data_path="../data",
       "cuda" if torch.cuda.is_available() else "cpu")
 
   n_classes = len(dictionary) + 1
-  original_model = ResNet(n_classes) if model == "ResNet" else Basic(n_classes)
+  Net = get_model(model)
+  original_model = Net(n_classes)
   original_model = original_model.to(device)
   model = nn.DataParallel(original_model) if parallel else original_model
 

@@ -4,7 +4,7 @@
 #BSUB -n 8
 #BSUB -R "span[block=1]"
 #BSUB -gpu "num=2:mode=exclusive_process"
-#BSUB -W 12:00
+#BSUB -W 23:59
 #BSUB -R "rusage[mem=32GB]"
 #BSUB -u andersbthuesen@gmail.com
 #BSUB -B
@@ -21,9 +21,9 @@ PATH=~/miniconda3/bin:$PATH
   --data-path /work3/s183926/data/librispeech \
   --dataset train-clean-360 \
   --batch-size 32 \
-  --num-epochs 50 \
-  --model ResNet \
+  --num-epochs 100 \
+  --model DilatedResNet \
   --num-workers 8 \
-  --log-dir /work3/s183926/runs/resnet-100_real_50-epochs \
-  --save models/resnet_100-real_50-epochs.pt \
+  --log-dir /work3/s183926/runs/test-dilatedresnet_100-real_100-epochs \
+  --save models/dilatedresnet_100-real_100-epochs.pt \
   --parallel
