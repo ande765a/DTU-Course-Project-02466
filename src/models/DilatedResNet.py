@@ -18,16 +18,16 @@ class DilatedResNet(nn.Module):
     self.bn2 = nn.BatchNorm2d(64)
 
     self.mp1 = nn.MaxPool2d((2, 1), stride=2)
-    self.a2 = nn.Conv2d(64, 128, kernel_size=1, stride=1)
 
     # Resnet block 2
     self.c3 = nn.Conv2d(
-        128, 128, kernel_size=3, stride=1, padding=(1, 2), dilation=(1, 2))
-    self.bn3 = nn.BatchNorm2d(128)
-    self.c4 = nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1)
-    self.bn4 = nn.BatchNorm2d(128)
+        64, 64, kernel_size=3, stride=1, padding=(1, 2), dilation=(1, 2))
+    self.bn3 = nn.BatchNorm2d(64)
+    self.c4 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
+    self.bn4 = nn.BatchNorm2d(64)
 
     self.mp2 = nn.MaxPool2d((2, 1))
+    self.a2 = nn.Conv2d(64, 128, kernel_size=1, stride=1)
 
     # Resnet block 3
     self.c5 = nn.Conv2d(
@@ -37,18 +37,17 @@ class DilatedResNet(nn.Module):
     self.bn6 = nn.BatchNorm2d(128)
 
     self.mp3 = nn.MaxPool2d((2, 1))
-    self.a3 = nn.Conv2d(128, 256, kernel_size=1, stride=1)
 
     # Resnet block 4
     self.c7 = nn.Conv2d(
-        256, 256, kernel_size=5, stride=1, padding=(2, 4), dilation=(1, 2))
-    self.bn7 = nn.BatchNorm2d(256)
-    self.c8 = nn.Conv2d(256, 256, kernel_size=5, stride=1, padding=2)
-    self.bn8 = nn.BatchNorm2d(256)
+        128, 128, kernel_size=5, stride=1, padding=(2, 4), dilation=(1, 2))
+    self.bn7 = nn.BatchNorm2d(128)
+    self.c8 = nn.Conv2d(128, 128, kernel_size=5, stride=1, padding=2)
+    self.bn8 = nn.BatchNorm2d(128)
 
     self.mp4 = nn.MaxPool2d((2, 1))
 
-    self.c9 = nn.Conv1d(256 * 4, n_classes, kernel_size=1, stride=1)
+    self.c9 = nn.Conv1d(128 * 4, n_classes, kernel_size=1, stride=1)
 
   def forward(self, mfcc):
     out = self.a1(mfcc)
@@ -65,8 +64,6 @@ class DilatedResNet(nn.Module):
 
     # Max pool
     out = self.mp1(out)
-    out = self.a2(out)
-    out = F.relu(out)
 
     # Resnet block 2
     o3 = self.c3(out)
@@ -79,6 +76,8 @@ class DilatedResNet(nn.Module):
 
     # Max pool
     out = self.mp2(out)
+    out = self.a2(out)
+    out = F.relu(out)
 
     # Resnet block 3
     o5 = self.c5(out)
@@ -91,8 +90,6 @@ class DilatedResNet(nn.Module):
 
     # Max pool
     out = self.mp3(out)
-    out = self.a3(out)
-    out = F.relu(out)
 
     # Resnet block 4
     o7 = self.c7(out)
@@ -104,7 +101,7 @@ class DilatedResNet(nn.Module):
     out = F.relu(c4)
 
     # Max pool
-    out = self.mp3(out)
+    out = self.mp4(out)
 
     # Flatten
     N, C, H, T = out.shape
