@@ -8,16 +8,18 @@ class DilatedResNet(nn.Module):
 
   def __init__(self, n_classes):
     super(DilatedResNet, self).__init__()
-    self.a1 = nn.Conv2d(1, 64, kernel_size=1, stride=1)
+    self.a1 = nn.Conv2d(1, 32, kernel_size=1, stride=1)
 
     # Resnet block 1
     self.c1 = nn.Conv2d(
-        64, 64, kernel_size=3, stride=1, padding=(1, 2), dilation=(1, 2))
-    self.bn1 = nn.BatchNorm2d(64)
-    self.c2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
-    self.bn2 = nn.BatchNorm2d(64)
+        32, 32, kernel_size=3, stride=1, padding=(1, 2), dilation=(1, 2))
+    self.bn1 = nn.BatchNorm2d(32)
+    self.c2 = nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1)
+    self.bn2 = nn.BatchNorm2d(32)
 
     self.mp1 = nn.MaxPool2d((2, 1), stride=2)
+    self.do1 = nn.Dropout2d(0.25)
+    self.a2 = nn.Conv2d(32, 64, kernel_size=1, stride=1)
 
     # Resnet block 2
     self.c3 = nn.Conv2d(
@@ -27,7 +29,8 @@ class DilatedResNet(nn.Module):
     self.bn4 = nn.BatchNorm2d(64)
 
     self.mp2 = nn.MaxPool2d((2, 1))
-    self.a2 = nn.Conv2d(64, 128, kernel_size=1, stride=1)
+    self.do2 = nn.Dropout2d(0.25)
+    self.a3 = nn.Conv2d(64, 128, kernel_size=1, stride=1)
 
     # Resnet block 3
     self.c5 = nn.Conv2d(
@@ -37,17 +40,20 @@ class DilatedResNet(nn.Module):
     self.bn6 = nn.BatchNorm2d(128)
 
     self.mp3 = nn.MaxPool2d((2, 1))
+    self.do3 = nn.Dropout2d(0.25)
+    self.a4 = nn.Conv2d(128, 256, kernel_size=1, stride=1)
 
     # Resnet block 4
     self.c7 = nn.Conv2d(
-        128, 128, kernel_size=5, stride=1, padding=(2, 4), dilation=(1, 2))
-    self.bn7 = nn.BatchNorm2d(128)
-    self.c8 = nn.Conv2d(128, 128, kernel_size=5, stride=1, padding=2)
-    self.bn8 = nn.BatchNorm2d(128)
+        256, 256, kernel_size=5, stride=1, padding=(2, 4), dilation=(1, 2))
+    self.bn7 = nn.BatchNorm2d(256)
+    self.c8 = nn.Conv2d(256, 256, kernel_size=5, stride=1, padding=2)
+    self.bn8 = nn.BatchNorm2d(256)
 
     self.mp4 = nn.MaxPool2d((2, 1))
+    self.do4 = nn.Dropout2d(0.25)
 
-    self.c9 = nn.Conv1d(128 * 4, n_classes, kernel_size=1, stride=1)
+    self.c9 = nn.Conv1d(256 * 4, n_classes, kernel_size=1, stride=1)
 
   def forward(self, mfcc):
     out = self.a1(mfcc)
@@ -64,6 +70,9 @@ class DilatedResNet(nn.Module):
 
     # Max pool
     out = self.mp1(out)
+    out = self.do1(out)
+    out = self.a2(out)
+    out = F.relu(out)
 
     # Resnet block 2
     o3 = self.c3(out)
@@ -76,7 +85,8 @@ class DilatedResNet(nn.Module):
 
     # Max pool
     out = self.mp2(out)
-    out = self.a2(out)
+    out = self.do2(out)
+    out = self.a3(out)
     out = F.relu(out)
 
     # Resnet block 3
@@ -90,6 +100,9 @@ class DilatedResNet(nn.Module):
 
     # Max pool
     out = self.mp3(out)
+    out = self.do3(out)
+    out = self.a4(out)
+    out = F.relu(out)
 
     # Resnet block 4
     o7 = self.c7(out)
@@ -102,6 +115,7 @@ class DilatedResNet(nn.Module):
 
     # Max pool
     out = self.mp4(out)
+    out = self.do4(out)
 
     # Flatten
     N, C, H, T = out.shape
