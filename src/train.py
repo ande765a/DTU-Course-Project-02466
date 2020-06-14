@@ -7,9 +7,9 @@ import multiprocessing
 from torch.nn.utils.rnn import pad_sequence
 from torch.nn import CTCLoss
 from torchaudio.transforms import MFCC
-from torch.utils.data import DataLoader, random_split, RandomSampler
+from torch.utils.data import DataLoader, Dataset, random_split, RandomSampler
 from torch.optim import Adam, SGD
-from torchaudio.datasets import LIBRISPEECH
+from librispeech import LibriSpeech
 from models import ResNet, DilatedResNet
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -67,30 +67,52 @@ def get_model(model):
     return Basic
 
 
-def train(data_path="../data",
-          dataset="dev-clean",
-          num_epochs=10,
-          batch_size=32,
-          parallel=False,
-          device_name=None,
-          load=None,
-          save=None,
-          model=None,
-          log_dir="runs",
-          num_workers=multiprocessing.cpu_count()):
+class RealSynthDataset(Dataset):
 
-  dataset = LIBRISPEECH(data_path, dataset, download=True)
-  test_size = len(dataset) // 10
-  val_size = 100
-  rest_dataset, train_dataset = random_split(
-      dataset, [test_size + val_size,
-                len(dataset) - (test_size + val_size)])
+  def __init__(self, real_dataset, synth_dataset=None, split=1):
+    self.real_dataset = real_dataset
+    self.synth_dataset = synth_dataset
+    self.split = split
 
-  val_dataset, test_dataset = random_split(rest_dataset, [val_size, test_size])
+  def __getitem__(self, index):
+    if index > self.split * len(self.real_dataset):
+      return self.synth_dataset[index]
+
+    return self.real_dataset[index]
+
+  def __len__(self):
+    if self.synth_dataset != None:
+      return len(self.real_dataset)
+    else:
+      return int(self.split * len(self.real_dataset))
+
+
+def train(
+    data_path="../data",
+    real_dataset="train-clean-360",
+    synth_dataset=None,  #"train-clean-360-synth"
+    split=1,
+    num_epochs=10,
+    batch_size=32,
+    parallel=False,
+    device_name=None,
+    load=None,
+    save=None,
+    model=None,
+    log_dir="runs",
+    num_workers=multiprocessing.cpu_count()):
+
+  real_dataset = LibriSpeech(data_path, real_dataset, download=True)
+  if synth_dataset != None:
+    synth_dataset = LibriSpeech(data_path, synth_dataset, download=False)
+
+  train_dataset = RealSynthDataset(real_dataset, synth_dataset, split)
+
+  test_dataset = LibriSpeech(data_path, "test-clean", download=True)
 
   val_dataloader = DataLoader(
-      val_dataset,
-      sampler=RandomSampler(val_dataset, replacement=True),
+      test_dataset,
+      sampler=RandomSampler(test_dataset, replacement=True),
       batch_size=16,
       collate_fn=pad_collate,
       num_workers=num_workers)
@@ -217,7 +239,18 @@ if __name__ == "__main__":
   parser.add_argument(
       "--data-path", type=str, help="Path for data", default="../data")
   parser.add_argument(
-      "--dataset", type=str, help="Dataset name", default="dev-clean")
+      "--real_dataset",
+      type=str,
+      help="Real dataset name",
+      default="train-clean-360")
+  parser.add_argument(
+      "--synth_dataset", type=str, help="Synthetic dataset name",
+      default=None)  #"train-clean-360-synth"
+  parser.add_argument(
+      "--split",
+      type=float,
+      help="Split between real and synthetic data",
+      default=1)
   parser.add_argument("--device-name", type=str, help="Device name")
   parser.add_argument("--batch-size", type=int, help="Batch size", default=32)
   parser.add_argument(
@@ -248,7 +281,9 @@ if __name__ == "__main__":
 
   train(
       data_path=args.data_path,
-      dataset=args.dataset,
+      real_dataset=args.real_dataset,
+      synth_dataset=args.synth_dataset,
+      split=args.split,
       device_name=args.device_name,
       batch_size=args.batch_size,
       parallel=args.parallel,

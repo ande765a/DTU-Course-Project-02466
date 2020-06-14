@@ -1,6 +1,6 @@
 #!/bin/sh
 #BSUB -q gpuv100
-#BSUB -J asr-model
+#BSUB -J asr-50_50
 #BSUB -n 8
 #BSUB -R "span[block=1]"
 #BSUB -gpu "num=2:mode=exclusive_process"
@@ -9,8 +9,8 @@
 #BSUB -u andersbthuesen@gmail.com
 #BSUB -B
 #BSUB -N
-#BSUB -o logs/exp1-100-%J.out
-#BSUB -e logs/exp1-100-%J.err
+#BSUB -o logs/50_50-%J.out
+#BSUB -e logs/50_50-%J.err
 
 module load cuda/10.2 cudnn/v7.6.5.32-prod-cuda-10.2
 nvidia-smi
