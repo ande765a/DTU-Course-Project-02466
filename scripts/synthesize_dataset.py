@@ -108,7 +108,8 @@ if __name__ == "__main__":
       transcript_output_path = os.path.join(audio_output_dir,
                                             transcript_filename)
 
-      shutil.copy(transcript_path, transcript_output_path)
+      if not os.path.exists(transcript_output_path):
+        shutil.copy(transcript_path, transcript_output_path)
 
       with open(transcript_path, "r") as file:
         for lines in chunks(file.readlines(), chunk_size):
