@@ -20,10 +20,10 @@ PATH=~/miniconda3/bin:$PATH
 ./src/train.py \
   --data-path /work3/s183926/data/librispeech \
   --real_dataset train-clean-360 \
-  --synth_dataset train-clean-360-synth \
-  --split 0.5 \
+  --split 0.01 \
   --batch-size 32 \
   --num-epochs 100 \
   --model DilatedResNet \
   --num-workers 8 \
-  --parallel
+  --parallel \
+  --save ./models/test.pt

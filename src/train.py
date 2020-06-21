@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import torch
 import argparse
 import torch.nn as nn
@@ -186,6 +187,14 @@ def train(
 
           writer.add_text("Real", ", ".join(val_texts_real), n_iter)
           writer.add_text("Predicted", ", ".join(val_texts_pred), n_iter)
+
+    if save:
+      filename = os.path.basename(save)
+      dirname = os.path.dirname(save)
+      checkpoint_filename = f"checkpoint-{filename}"
+      checkpoint_path = os.path.join(dirname, checkpoint_filename)
+      print(f"Saving checkpoint for epoch {epoch+1} to: {checkpoint_filename}")
+      torch.save(model.state_dict(), checkpoint_path)
 
   if save:
     print(f"Saving model to: {save}")
