@@ -4,7 +4,6 @@ import argparse
 import torch.nn as nn
 import numpy as np
 import multiprocessing
-from torch.nn.utils.rnn import pad_sequence
 from torch.nn import CTCLoss
 from torchaudio.transforms import MFCC
 from torch.utils.data import DataLoader, Dataset, random_split, RandomSampler
@@ -14,48 +13,7 @@ from models import ResNet, DilatedResNet
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 from evaluation import WER, CER, collapse, remove_blanks
-
-dictionary = "ABCDEFGHIJKLMNOPQRSTUVWXYZ' "
-
-
-def text_to_tensor(text, dictionary=dictionary):
-  """
-  This function will convert a string of text
-  to a tensor of character indicies in the given dictionary.
-  The indicies will start from 1, as 0 means the blank
-  character.
-  """
-  return torch.tensor([
-      dictionary.index(c) + 1 if c in dictionary else 0
-      for c in list(text.upper())
-  ])
-
-
-def tensor_to_text(tensor, dictionary=dictionary):
-  return "".join(["-" if i == 0 else dictionary[i - 1] for i in tensor])
-
-
-mfcc = MFCC(n_mfcc=64)
-
-
-def waveforms_to_padded_mfccs(waveforms):
-  mfccs = [mfcc(wave) for wave in waveforms]
-  mfcc_lenghts = torch.tensor([mfcc.shape[2] for mfcc in mfccs])
-  padded_mfccs = pad_sequence([mfcc.T for mfcc in mfccs],
-                              batch_first=True).permute(0, 3, 2, 1)
-  return padded_mfccs, mfcc_lenghts
-
-
-def encode_utterances(utterances):
-  encodings = torch.cat([text_to_tensor(utterance) for utterance in utterances])
-  encoding_lengths = torch.tensor([len(utterance) for utterance in utterances])
-  return encodings, encoding_lengths
-
-
-def pad_collate(datapoints):
-  waveforms, _, utterances, *rest = zip(*datapoints)
-
-  return waveforms, utterances
+from data import dictionary, text_to_tensor, tensor_to_text, waveforms_to_padded_mfccs, encode_utterances, pad_collate
 
 
 def get_model(model):
@@ -147,6 +105,8 @@ def train(
   loss_fn = CTCLoss()
   print(f"Using device: {device}")
 
+  mfcc = MFCC(n_mfcc=64)
+
   writer = SummaryWriter(log_dir)
 
   n_iter = 0
@@ -161,7 +121,7 @@ def train(
       # First we zero our gradients, to make everything work nicely.
       optimizer.zero_grad()
 
-      X, X_lengths = waveforms_to_padded_mfccs(waveforms)
+      X, X_lengths = waveforms_to_padded_mfccs(waveforms, mfcc)
       y, y_lengths = encode_utterances(utterances)
 
       X = X.to(device)
@@ -189,7 +149,7 @@ def train(
 
           waveforms, utterances = next(iter(val_dataloader))
 
-          X, X_lengths = waveforms_to_padded_mfccs(waveforms)
+          X, X_lengths = waveforms_to_padded_mfccs(waveforms, mfcc)
           y, y_lengths = encode_utterances(utterances)
 
           X = X.to(device)

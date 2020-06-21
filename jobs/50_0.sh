@@ -26,5 +26,5 @@ PATH=~/miniconda3/bin:$PATH
   --model DilatedResNet \
   --num-workers 8 \
   --parallel \
-  --log-dir /work3/s183926/runs/50_0_100-epochs \
-  --save models/50_0_100-epochs.pt \
+  --log-dir ./runs/50_0_100-epochs \
+  --save ./models/50_0_100-epochs.pt \
