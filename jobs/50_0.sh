@@ -22,9 +22,9 @@ PATH=~/miniconda3/bin:$PATH
   --real_dataset train-clean-360 \
   --split 0.5 \
   --batch-size 32 \
-  --num-epochs 100 \
+  --num-epochs 200 \
   --model DilatedResNet \
   --num-workers 8 \
   --parallel \
-  --log-dir ./runs/50_0_100-epochs \
-  --save ./models/50_0_100-epochs.pt \
+  --log-dir ./runs/50_0_200-epochs \
+  --save ./models/50_0_200-epochs.pt \

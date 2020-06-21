@@ -27,4 +27,4 @@ PATH=~/miniconda3/bin:$PATH
   --num-workers 8 \
   --parallel \
   --log-dir ./runs/75_0_133-epochs \
-  --save ./models/75_0_100-epochs.pt \
+  --save ./models/75_0_133-epochs.pt \
