@@ -15,7 +15,13 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 
-def evaluate(data_path, test_dataset, load, batch_size=16, parallel=False):
+def evaluate(data_path,
+             test_dataset,
+             load,
+             real_data,
+             synth,
+             batch_size=16,
+             parallel=False):
   mfcc = MFCC(n_mfcc=64)
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   original_model = DilatedResNet(n_classes=len(dictionary) + 1)
@@ -63,8 +69,11 @@ def evaluate(data_path, test_dataset, load, batch_size=16, parallel=False):
     all_CERS += CERS
     all_WERS += WERS
 
-  np.save("CERS.npy", all_CERS)
-  np.save("WERS.npy", all_WERS)
+  print("real_data,synth,utterance,CER,WER")
+  for i in range(len(all_CERS)):
+    wer = all_WERS[i]
+    cer = all_CERS[i]
+    print(f"{real_data},{1 if synth else 0},{i},{cer},{wer}")
 
 
 if __name__ == "__main__":
@@ -82,6 +91,16 @@ if __name__ == "__main__":
       help="Train in parallel",
       default=False)
 
+  parser.add_argument("--real-data", type=float, help="Amount of real data")
+
+  parser.add_argument(
+      "--synth",
+      type=bool,
+      nargs="?",
+      const=True,
+      help="Synth data is added",
+      default=False)
+
   parser.add_argument(
       "--load", type=str, help="Model parameters", default="model.pt")
 
@@ -92,4 +111,6 @@ if __name__ == "__main__":
       test_dataset=args.test_dataset,
       load=args.load,
       batch_size=args.batch_size,
+      real_data=args.real_data,
+      synth=args.synth,
       parallel=args.parallel)
